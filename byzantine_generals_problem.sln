@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34009.444
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "byzantine_generals_problem", "byzantine_generals_problem.csproj", "{1430D370-C505-49FF-9F76-9524C6C58E9D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1430D370-C505-49FF-9F76-9524C6C58E9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1430D370-C505-49FF-9F76-9524C6C58E9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1430D370-C505-49FF-9F76-9524C6C58E9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1430D370-C505-49FF-9F76-9524C6C58E9D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {93850D93-49C6-4CB6-A295-835134EE84E0}
+	EndGlobalSection
+EndGlobal
