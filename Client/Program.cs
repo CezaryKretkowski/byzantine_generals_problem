@@ -1,6 +1,9 @@
-﻿using System.Net;
+﻿using System.Data;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Unicode;
 
 internal class Program
@@ -8,6 +11,7 @@ internal class Program
     private readonly UdpClient _udpClient;
     private bool _isRunning;
     private IPEndPoint _ipEndPoint;
+    private bool isExeciute;
     
     public Program(string ipAddress)
     {
@@ -18,20 +22,26 @@ internal class Program
         _isRunning = true;
     }
 
-    private void GetQuery()
+    private async void GetQuery()
     {
         var query = "";
-        Console.Write("SQL>");
-        do
+        if (!isExeciute)
         {
-            query += Console.ReadLine();
-        } while (!query.Last().Equals(';')&&!query.Contains("exit"));
+            
+            Console.Write("SQL>");
+            do
+            {
+                query += Console.ReadLine();
+            } while (!query.Last().Equals(';') && !query.Contains("exit"));
+        }
 
         if (query.Contains("exit()"))
             _isRunning = false;
         else
         {
-            SendAndReceive(query);
+            var result = await SendAndReceive(query);
+            Console.WriteLine(result);
+            isExeciute = false;
             
         }
     }
@@ -61,31 +71,33 @@ internal class Program
         
         var udpServer = new Program(args[0]);
         udpServer.MainLoop();
-        //udpServer.SendAndReceive();
+        
 
     }
-    public async Task<bool> SendAndReceive(string query) {
+    public async Task<string> SendAndReceive(string query) {
 
-        var receive = false;
+        var returnString="";
+        isExeciute = true;
         await _udpClient.SendAsync(Encoding.UTF8.GetBytes(query), query.Length, _ipEndPoint);
         var receiveTask = await _udpClient.ReceiveAsync();
         var result = Encoding.UTF8.GetString(receiveTask.Buffer);
         if (!string.IsNullOrEmpty(result))
         {
-            Console.WriteLine();
-            Console.WriteLine("Response form: "+receiveTask.RemoteEndPoint);
+            
+            returnString+="Response form: "+receiveTask.RemoteEndPoint+"\n";
             
             var index = result.IndexOf("Result:", StringComparison.Ordinal);
             result = result.Substring(index);
-            Console.WriteLine(result);
-            receive = true;
+            returnString+=result;
+            
         }
         else
         {
-            Console.WriteLine("Time out!! Cluster not responding!!");
+            returnString+="Time out!! Cluster not responding!!";
+            
         }
         
-        return receive;
+        return returnString;
         
     }
 }
