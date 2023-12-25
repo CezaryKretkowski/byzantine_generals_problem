@@ -9,129 +9,204 @@ using System.Threading.Tasks;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.ComponentModel.Design;
+using System.Globalization;
+using server.src.common;
 
 namespace server.src
 {
     public class UdpServer
     {
-        UdpClient listener;
-        List<EndPoint> addresses;
-        bool isRunning;
-        bool isLeader;
-        bool isForwarded;
-        bool isCandidate;
-        Thread mainThread;
-        IPEndPoint liderServer;
-        bool heartbeat;
-        int hostNumber;
-        int votes;
+
+
+        public UdpClient Listener { get; init; }
+        private UdpClient ClientListener { get; init; }
+        private UdpClient DataBaseListener { get; init; }
+        public List<EndPoint> Addresses { get; init; }
+        private bool IsRunning { get; set; }
+        public bool IsLeader { get; set; }
+        
+        public bool IsForwarded { get; set; }
+        public bool IsCandidate { get; set; }
+        private readonly Thread _mainThread;
+        private readonly Thread _clientListenerThread;
+        private readonly Thread _dataBaseListenerThread;
+        public int HostNumber { get; init; }
+        private readonly HeartBeatController _heartBeatController;
+        private readonly VoteController _voteController;
+        private readonly ClientMessageController _clientMessageController;
+        public int Vote { get; set; }
+        public string ServerName { get; init; }
+        private IPEndPoint ServerEndPoint { get; init; }
+        public IPEndPoint LeaderEndPoint { get; set; }
+        public IPEndPoint LeaderEndPointClientListener { get; set; }
+        public IPEndPoint LeaderEndPointDataBaseListener { get; set; }
+        public DataBaseClient DataBaseClient { get; init; }
+
+        //public string LeaderAddress { get; set; } = string.Empty;
+        //public string LeaderAddress { get; set; } = string.Empty;
+
 
 
         public void Stop()
         {
             lock (new object())
             {
-                isRunning = false;
+                IsRunning = false;
             }
 
-            mainThread.Join();
+            _mainThread.Join();
+            _clientListenerThread.Join();
+            _dataBaseListenerThread.Join();
         }
         public void Start()
         {
-            mainThread.Start();
-        }
-        private async Task<string> GetFreeAddres() {
-            int i = 0;
-
-            while (i < 10) {
-                i++;
-                string ipAddres = "127.0.0." + i;
-                using (Ping ping = new Ping())
-                {
-                    try
-                    {
-
-                        PingReply reply = await ping.SendPingAsync(ipAddres);
-                        if (reply.Status != IPStatus.Success) {
-                            return ipAddres;
-                        }
-                    }
-                    catch (PingException ex)
-                    {
-                        Console.WriteLine($"Błąd podczas sprawdzania adresu {ipAddres}: {ex.Message}");
-                    }
-                }
-            }
-            return String.Empty;
+            _mainThread.Start();
+            _clientListenerThread.Start();
+            _dataBaseListenerThread.Start();
         }
 
-        public UdpServer(string ipAddress,int hostNumber)
+
+        public UdpServer(string ipAddress,int hostNumber,string serverName,string connectionString)
         {
-            addresses = new List<EndPoint>();
-            mainThread = new Thread(Run);
-            IPAddress address = IPAddress.Parse(ipAddress);
-            var endPointClient = new IPEndPoint(address, 7766);
-            listener = new UdpClient(endPointClient);
-            isRunning = true;
-            isLeader = false;
+            _mainThread = new Thread(Run);
+            _clientListenerThread = new Thread(RunClientListener);
+            _dataBaseListenerThread = new Thread(RunDataBaseListener);
+            var address = IPAddress.Parse(ipAddress);
+            var ipEndPoint = new IPEndPoint(address, 7766);
+            ServerEndPoint = ipEndPoint;
+            ServerName = serverName;
+            HostNumber = hostNumber;
+            Listener = new UdpClient(ipEndPoint);
+            var ipEndPoint2 = new IPEndPoint(address, 7767);
+            ClientListener = new UdpClient(ipEndPoint2);
+            var ipEndPoint3 = new IPEndPoint(address, 7765);
+            DataBaseListener = new UdpClient(ipEndPoint3);
+            IsRunning = true;
+            IsLeader = false;
+            IsForwarded = true;
+            Addresses = new List<EndPoint>();
+            _heartBeatController = new HeartBeatController(this);
+            _voteController = new VoteController(this);
+            _clientMessageController = new ClientMessageController(this);
+            Vote = 0;
+            DataBaseClient = new DataBaseClient(connectionString);
 
         }
 
-        async void MessageHandler(UdpReceiveResult receiveResult, string message) {
-            if (!message.Contains("Server"))
+        private void ClientMessageHandler(UdpReceiveResult receiveResult, string message)
+        {
+            _clientMessageController.Receive(receiveResult,message);
+        }
+        
+        private void ServerMessageHandler(UdpReceiveResult receiveResult, string message)
+        {
+            if (message.ToLower().Contains("heartbeat"))
             {
-                if (!isLeader)
-                {
-                    await listener.SendAsync(Encoding.UTF8.GetBytes(message), message.Length, liderServer);
-                }
+                _heartBeatController.Receive(receiveResult,message);
             }
-            else {
-                if (!addresses.Contains(receiveResult.RemoteEndPoint))
-                    addresses.Add(receiveResult.RemoteEndPoint);
-                if (receiveResult.RemoteEndPoint.Equals(liderServer)) {
-                    heartbeat = true;
-                    string hearbeatMessage = "Server recive heartbeat";
-                    await listener.SendAsync(Encoding.UTF8.GetBytes(hearbeatMessage), hearbeatMessage.Length, liderServer);
-                }
-                if (message.Contains("Vote")&&isCandidate) {
-                    votes++;
-                    if (votes > hostNumber / 2)
-                    {
-                        isCandidate = false;
-                        isLeader = true;
-                        await listener.SendAsync(Encoding.UTF8.GetBytes("Server im a leadre"), "Server im a leadre".Length, new IPEndPoint(IPAddress.Broadcast, 7766));
-                    }
-                }
+
+            if (message.ToLower().Contains("vote"))
+            {
+                _voteController.Receive(receiveResult,message);
             }
+
+        }
+
+        private void ReplicationMessageHandler(UdpReceiveResult receiveResult, string message)
+        {
+            var myEndpoint = new IPEndPoint(ServerEndPoint.Address,7765);
+            if (!IsLeader && !myEndpoint.Equals(receiveResult.RemoteEndPoint))
+            {
+                DataBaseClient.ExecuteQuery(message);
+            }
+        }
+
+        private  void MessageHandler(UdpReceiveResult receiveResult, string message)
+        {
+
+            if (message.ToLower().Contains("server"))
+            {
+                ServerMessageHandler(receiveResult, message);
+            }
+            
+        }
+
+        private void WhenReceive(Task<UdpReceiveResult> receiveTask)
+        {
+            byte[] reciveMessage = receiveTask.Result.Buffer;
+            var message = Encoding.UTF8.GetString(reciveMessage);
+            if (!ServerEndPoint.Equals(receiveTask.Result.RemoteEndPoint))
+            {
+
+                Console.WriteLine( $"{ServerName} Otrzymano wiadomość od {receiveTask.Result.RemoteEndPoint}: {message} time {DateTime.Now.ToString("h:mm:ss.fff tt")}");
+                MessageHandler(receiveTask.Result, message);
+            }
+        }
+
+        private  void WhenTimeOut()
+        {
+            Console.WriteLine($"{ServerName} Timeout time {DateTime.Now.ToString("h:mm:ss.fff tt")}");
+
+            if (IsLeader != true)
+            {
+                if(IsCandidate == false)
+                    Vote = 1;
+                IsCandidate = true;
+                Console.WriteLine($"{ServerName} is Candidate time {DateTime.Now.ToString("h:mm:ss.fff tt")}");
+                
+                _voteController.SendVote();
+            }
+            
         }
         
         private async void Run()
         {
-   
-            Console.WriteLine("Server listen...");
-            while (isRunning)
+            Console.WriteLine("Server listen...");//
+            while (IsRunning)
             {
-
-                Task<UdpReceiveResult> receiveTask = listener.ReceiveAsync();
-                Task timeout= Task.Delay(2000);
-                Task completed = await Task.WhenAny(receiveTask,timeout);
+                var receiveTask = Listener.ReceiveAsync();
+                var timeout= Task.Delay(1000);
+                var completed = await Task.WhenAny(receiveTask,timeout);
                 if (completed == receiveTask)
                 {
-                    byte[] reciveMessage = receiveTask.Result.Buffer;
-                    var message = Encoding.UTF8.GetString(reciveMessage);
-                    Console.WriteLine($"Otrzymano wiadomość od {receiveTask.Result.RemoteEndPoint}: {message}");
-                    MessageHandler(receiveTask.Result,message);
+
+                   WhenReceive(receiveTask);
+                   Thread.Sleep(250);
                 }
                 else {
-                    Console.WriteLine("Timeout");
-                    heartbeat = false;
-                    if (isLeader != true) {
-                        isCandidate = true;
-                        var ms = "server is candidate";
-                        IPEndPoint brodcast = new  IPEndPoint(IPAddress.Broadcast,7766);
-                        await listener.SendAsync(Encoding.UTF8.GetBytes(ms),ms.Length,brodcast);
-                    }
+                    WhenTimeOut();
                 }
+                if(IsLeader)
+                    HeartBeatController.SendHeartBeat(this);
+            }
+        }
+
+        private async void RunClientListener()
+        {
+            Console.WriteLine("Server client listen...");
+            while (IsRunning)
+            {
+                var receiveTask = await ClientListener.ReceiveAsync();
+                byte[] reciveMessage = receiveTask.Buffer;
+                var message = Encoding.UTF8.GetString(reciveMessage);
+                Console.WriteLine( $"{ServerName} Otrzymano wiadomość od {receiveTask.RemoteEndPoint}: {message} time {DateTime.Now.ToString("h:mm:ss.fff tt")}");
+                if(!string.IsNullOrEmpty(message))
+                    ClientMessageHandler(receiveTask,message);
+     
+            }
+        }
+        private async void RunDataBaseListener()
+        {
+            Console.WriteLine("Server client listen...");
+            while (IsRunning)
+            {
+                var receiveTask = await DataBaseListener.ReceiveAsync();
+                byte[] reciveMessage = receiveTask.Buffer;
+                var message = Encoding.UTF8.GetString(reciveMessage);
+                Console.WriteLine( $"{ServerName} Otrzymano wiadomość od {receiveTask.RemoteEndPoint}: {message} time {DateTime.Now.ToString("h:mm:ss.fff tt")}");
+                if(!string.IsNullOrEmpty(message))
+                    ReplicationMessageHandler(receiveTask,message);
+     
             }
         }
     }
