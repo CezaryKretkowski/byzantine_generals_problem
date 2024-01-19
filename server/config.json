@@ -1,6 +1,6 @@
 ﻿{
   "hostNumber": 3,
-  "connectionString": "",
-  "serverName":"",
-  "ipAddress": ""
+  "connectionString": "Data Source=Instance1.db;",
+  "serverName": "ServerName",
+  "ipAddress": "192.168.1.68"
 }

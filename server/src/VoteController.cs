@@ -28,7 +28,8 @@ public class VoteController
             _client.Vote = 1;
             _client.IsForwarded = true;
             var responseMessage = "server vote response";
-            await _client.Listener.SendAsync(Encoding.UTF8.GetBytes(responseMessage),responseMessage.Length,receiveResult.RemoteEndPoint);
+            await _client.Listener.SendAsync(Encoding.UTF8.GetBytes(responseMessage),responseMessage.Length
+                ,receiveResult.RemoteEndPoint);
         }
         if(message.ToLower().Contains("response"))
         {
@@ -42,7 +43,8 @@ public class VoteController
                     _client.IsLeader = true;
                     _client.IsCandidate = false;
                     _client.IsForwarded = false;
-                    Console.WriteLine(_client.ServerName + " Is Leader vote result "+ _client.Vote +"/"+_client.HostNumber+" require votes:"+requireVotes);
+                    Console.WriteLine(_client.ServerName + " Is Leader vote result "
+                        + _client.Vote +"/"+_client.HostNumber+" require votes:"+requireVotes);
                     HeartBeatController.SendHeartBeat(_client);
 
                 }

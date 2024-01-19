@@ -7,11 +7,11 @@ public class Program
     private Config _config;
     public UdpServer Instance { get; init; }
 
-    public void Configuration()
+    public void Configuration(string path)
     {
         try
         {
-            using (var reader = new StreamReader("config.json"))
+            using (var reader = new StreamReader(path))
             {
                 string json = reader.ReadToEnd();
                 var config = System.Text.Json.JsonSerializer.Deserialize<Config>(json);
@@ -21,6 +21,7 @@ public class Program
                 {
                     throw new Exception("Cannot init server: failed to initialize configuration");
                 }
+                Console.WriteLine(config);
             }
                 
         }catch (Exception ex)
@@ -29,9 +30,9 @@ public class Program
         }
     }
 
-    public Program()
+    public Program(string path)
     {
-        Configuration();
+        Configuration(path);
         
         if (_config != null)
         {
@@ -63,30 +64,31 @@ public class Program
     private static void Main(string[] args)
     {
         bool isr = true;
-        //var server = new Program();
-        #region Testing
-        string connectionString = "Data Source=localhost\\SQLEXPRESS;Initial Catalog=Instance1;User ID=user;Password=admin;TrustServerCertificate=True;";
+        var server = new Program(args[0]);
+        /*#region Testing
+        string connectionString = "Data Source=Instance1.db;";
         UdpServer server1 = new UdpServer("127.0.0.1",5,"Server 1",connectionString);
-        connectionString = "Data Source=localhost\\SQLEXPRESS;Initial Catalog=Instance2;User ID=user;Password=admin;TrustServerCertificate=True;";
+        connectionString = "Data Source=Instance2.db;";
         UdpServer server2 = new UdpServer("127.0.0.2", 5,"Server 2",connectionString);
-        connectionString = "Data Source=localhost\\SQLEXPRESS;Initial Catalog=Instance3;User ID=user;Password=admin;TrustServerCertificate=True;";
+        connectionString = "Data Source=Instance3.db;";
         UdpServer server3 = new UdpServer("127.0.0.3", 5,"Server 3",connectionString);
         server1.Start();
         server3.Start();
         server2.Start();
         #endregion
-        
+        */
         Console.CancelKeyPress += delegate (object? sender, ConsoleCancelEventArgs e)
         {
             isr = false;
-            //server.Stop();
+            server.Stop();
             #region Testing
-            server1.Stop();
-            server2.Stop();
-            server3.Stop();
+          //  server1.Stop();
+           // server2.Stop();
+            //server3.Stop();
             #endregion
             e.Cancel = true;
         };
+        server.Start();
         while (isr){}
         
     }

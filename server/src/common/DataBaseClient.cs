@@ -10,6 +10,7 @@ using System.Data;
 using System.Net.Http.Json;
 using System.Xml;
 using Newtonsoft.Json;
+using System.Data.SQLite;
 
 namespace server.src.common
 {
@@ -63,9 +64,10 @@ namespace server.src.common
                 throw new Exception("Cannot init database client: Connection string is empty");
             }
             _config = new Config(conectionString);
+           
         }
 
-        public string GetSelectReult(SqlDataReader dataReader) {
+        public string GetSelectReult(SQLiteDataReader dataReader) {
             var listName = new List<string>();
             var dataTable = new DataTable("Result");
 
@@ -91,11 +93,11 @@ namespace server.src.common
         public SQLServerResponse ExecuteQuery(string query) {
 
             var result = new SQLServerResponse();
-            using (var connection = new SqlConnection(_config.conectionString)) {
+            using (var connection = new SQLiteConnection(_config.conectionString)) {
                 connection.Open();
                 try
                 {
-                    using (var sqlCommand = new SqlCommand(query, connection))
+                    using (var sqlCommand = new SQLiteCommand(query, connection))
                     {
                         using (var dataReader = sqlCommand.ExecuteReader()) { 
                             
